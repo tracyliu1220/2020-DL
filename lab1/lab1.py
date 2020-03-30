@@ -126,7 +126,7 @@ class GenData:
 
 
 class SimpleNet:
-    def __init__(self, hidden_size, num_step=2000, print_interval=100): #TODO
+    def __init__(self, hidden_size, num_step=2000, print_interval=100, lr=0.2): #TODO
         """ A hand-crafted implementation of simple network.
 
         Args:
@@ -141,13 +141,21 @@ class SimpleNet:
         # Please initiate your network parameters here.
         input_size = 2
         output_size = 1
-        self.lr = 0.2
+        self.lr = lr
+        self.mo = 0.9
         self.w1 = np.random.randn(input_size, hidden_size)
         self.w2 = np.random.randn(hidden_size, hidden_size)
         self.w3 = np.random.randn(hidden_size, output_size)
         self.b1 = np.zeros((1, hidden_size))
         self.b2 = np.zeros((1, hidden_size))
         self.b3 = np.zeros((1, output_size))
+        
+        self.v_w1 = np.zeros((input_size, hidden_size) )
+        self.v_w2 = np.zeros((hidden_size, hidden_size))
+        self.v_w3 = np.zeros((hidden_size, output_size))
+        self.v_b1 = np.zeros((1, hidden_size))
+        self.v_b2 = np.zeros((1, hidden_size))
+        self.v_b3 = np.zeros((1, output_size))
 
     @staticmethod
     def plot_result(data, gt_y, pred_y):
@@ -213,14 +221,23 @@ class SimpleNet:
         dout    = np.multiply(dout, der_sigmoid(self.a1))
         grad_w1 = np.dot(self.input.T, dout)
         grad_b1 = np.sum(dout, axis=0)
-
-        self.w1 -= self.lr * grad_w1
-        self.w2 -= self.lr * grad_w2
-        self.w3 -= self.lr * grad_w3
         
-        self.b1 -= self.lr * grad_b1
-        self.b2 -= self.lr * grad_b2
-        self.b3 -= self.lr * grad_b3
+        
+        self.v_w1 = self.mo * self.v_w1 + self.lr * grad_w1 
+        self.v_w2 = self.mo * self.v_w2 + self.lr * grad_w2
+        self.v_w3 = self.mo * self.v_w3 + self.lr * grad_w3
+                                                           
+        self.v_b1 = self.mo * self.v_b1 + self.lr * grad_b1
+        self.v_b2 = self.mo * self.v_b2 + self.lr * grad_b2
+        self.v_b3 = self.mo * self.v_b3 + self.lr * grad_b3
+
+        self.w1 -= self.v_w1
+        self.w2 -= self.v_w2
+        self.w3 -= self.v_w3
+                            
+        self.b1 -= self.v_b1
+        self.b2 -= self.v_b2
+        self.b3 -= self.v_b3
 
         return
 
@@ -236,8 +253,11 @@ class SimpleNet:
 
         n = inputs.shape[0]
         self.pre_error = 100000
+        error = 0
 
         for epochs in range(self.num_step):
+            error = 0
+
             for idx in range(n):
                 # operation in each training step:
                 #   1. forward passing
@@ -247,9 +267,17 @@ class SimpleNet:
                 self.error = self.output - labels[idx:idx+1, :]
                 self.backward()
 
+                error += self.error[0][0] * self.error[0][0]
+
             if epochs % self.print_interval == 0:
                 print('Epochs {}: '.format(epochs))
                 self.test(inputs, labels)
+        
+            
+            if error > self.pre_error:
+                self.lr *= 0.8
+                pass
+            self.pre_error = error
 
         print('Training finished')
         self.test(inputs, labels)
@@ -273,18 +301,21 @@ class SimpleNet:
 
         error /= n
         acc /= n
-        if error > self.pre_error:
-            self.lr *= 0.8
-        self.pre_error = error
         print('accuracy: %.2f' % (acc * 100) + '%')
         print('')
 
 
 if __name__ == '__main__':
-    data, label = GenData.fetch_data('Grid', 100)
+    data, label = GenData.fetch_data('XOR', 100)
 
-    net = SimpleNet(20, num_step=900)
+    net = SimpleNet(, num_step=1000, lr=0.1)
     net.train(data, label)
+    
+    pred_result = np.round(net.forward(data))
+    SimpleNet.plot_result(data, label, pred_result)
+
+    data, label = GenData.fetch_data('XOR', 150)
+    net.test(data, label)
 
     pred_result = np.round(net.forward(data))
     SimpleNet.plot_result(data, label, pred_result)

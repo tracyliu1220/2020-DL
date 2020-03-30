@@ -75,6 +75,36 @@ class GenData:
 
         return np.array(inputs), np.array(labels).reshape((-1, 1))
 
+    def _gen_circle(n=100):
+        inputs = []
+        labels = []
+
+        for i in range(n):
+            for j in range(n):
+                x = (i + 1) / (n + 1)
+                y = (j + 1) / (n + 1)
+                inputs.append([x, y])
+                if abs(x - 0.5) * abs(x - 0.5) + abs(y - 0.5) * abs(y - 0.5)  <= 0.09:
+                    labels.append(1)
+                else:
+                    labels.append(0)
+        
+        return np.array(inputs), np.array(labels).reshape((-1, 1))
+
+    def _gen_grid(n=100):
+        inputs = []
+        labels = []
+        
+        for i in range(n):
+            for j in range(n):
+                x = (i + 1) / (n + 1)
+                y = (j + 1) / (n + 1)
+                inputs.append([x, y])
+                labels.append((int(x / 0.2) % 2) ^ (int(y / 0.2) % 2))
+        
+        return np.array(inputs), np.array(labels).reshape((-1, 1))
+
+
     @staticmethod
     def fetch_data(mode, n):
         """ Data gather interface
@@ -83,11 +113,13 @@ class GenData:
             mode (str): 'Linear' or 'XOR', indicate which generator is used.
             n (int):    the number of data points generated in total.
         """
-        assert mode == 'Linear' or mode == 'XOR'
+        assert mode == 'Linear' or mode == 'XOR' or mode == 'Circle' or mode == 'Grid'
 
         data_gen_func = {
             'Linear': GenData._gen_linear,
-            'XOR': GenData._gen_xor
+            'XOR': GenData._gen_xor,
+            'Circle': GenData._gen_circle,
+            'Grid': GenData._gen_grid
         }[mode]
 
         return data_gen_func(n)
@@ -232,23 +264,26 @@ class SimpleNet:
         """
         n = inputs.shape[0]
         error = 0
+        acc = 0
 
         for idx in range(n):
             result = self.forward(inputs[idx:idx+1, :])
             error += abs(result - labels[idx:idx+1, :])
+            acc += (result[0][0] >= 0.5) == labels[idx:idx+1, :][0][0]
 
         error /= n
+        acc /= n
         if error > self.pre_error:
             self.lr *= 0.8
         self.pre_error = error
-        print('accuracy: %.2f' % ((1 - error)*100) + '%')
+        print('accuracy: %.2f' % (acc * 100) + '%')
         print('')
 
 
 if __name__ == '__main__':
-    data, label = GenData.fetch_data('Linear', 70)
+    data, label = GenData.fetch_data('Grid', 100)
 
-    net = SimpleNet(20, num_step=1500)
+    net = SimpleNet(20, num_step=900)
     net.train(data, label)
 
     pred_result = np.round(net.forward(data))

@@ -28,7 +28,7 @@ The sample.py includes the following template functions:
 3. BLEU-4 score function
 
 You have to modify them to complete the lab.
-In addition, there are still other functions that you have to 
+In addition, there are still other functions that you have to
 implement by yourself.
 
 1. Your own dataloader (design in your own way, not necessary Pytorch Dataloader)
@@ -38,8 +38,8 @@ implement by yourself.
 ========================================================================================"""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SOS_token = 0
-EOS_token = 1
+SOS_token = -1
+EOS_token = -2
 #----------Hyper Parameters----------#
 hidden_size = 256
 #The number of vocabulary
@@ -124,7 +124,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     decoder_hidden = encoder_hidden
 
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
-	
+
 
     #----------sequence to sequence part for decoder----------#
     if use_teacher_forcing:
@@ -198,9 +198,8 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
             print_loss_total = 0
             print('%s (%d %d%%) %.4f' % (timeSince(start, iter / n_iters),
                                          iter, iter / n_iters * 100, print_loss_avg))
-	
+
 
 encoder1 = EncoderRNN(vocab_size, hidden_size).to(device)
 decoder1 = DecoderRNN(hidden_size, vocab_size).to(device)
 trainIters(encoder1, decoder1, 75000, print_every=5000)
-

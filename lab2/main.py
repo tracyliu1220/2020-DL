@@ -17,6 +17,7 @@ def Train(net, epoches, train_data, test_data, optimizer, loss_func, batch_size=
     testloader = data.DataLoader(test_data, batch_size=120, shuffle=False, num_workers=0)
 
     for epoch in range(epoches):
+        net.train()
         trainloader = data.DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=0)
         print('\033[38;5;014mepoch', epoch, '\033[0m')
         running_loss = 0
@@ -45,25 +46,27 @@ def Train(net, epoches, train_data, test_data, optimizer, loss_func, batch_size=
         Test(net, testloader, loss_func)
 
 def Test(net, testloader, loss_func):
-    global highest_acc
-    running_loss = 0
-    cnt = 0
-    acc = 0
-    for i, _data in enumerate(testloader, 0):
-        cnt += 1
-        inputs, labels = _data
-        inputs = inputs.to(device)
-        labels = labels.to(device)
-        outputs = net(inputs)
-        loss = loss_func(outputs, labels)
-        running_loss += loss.item()
-        acc += accuracy(outputs, labels)
-    # print('\033[38;5;011m---')
-    # print('test loss:', running_loss / cnt)
-    # print('test acc :', acc / cnt)
-    # print('---\033[0m')
-    highest_acc = max(highest_acc, acc / cnt)
-    print('\033[38;5;011macc:', acc / cnt, 'highest:', highest_acc, '\033[0m')
+    net.eval()
+    with torch.no_grad():
+        global highest_acc
+        running_loss = 0
+        cnt = 0
+        acc = 0
+        for i, _data in enumerate(testloader, 0):
+            cnt += 1
+            inputs, labels = _data
+            inputs = inputs.to(device)
+            labels = labels.to(device)
+            outputs = net(inputs)
+            loss = loss_func(outputs, labels)
+            running_loss += loss.item()
+            acc += accuracy(outputs, labels)
+        # print('\033[38;5;011m---')
+        # print('test loss:', running_loss / cnt)
+        # print('test acc :', acc / cnt)
+        # print('---\033[0m')
+        highest_acc = max(highest_acc, acc / cnt)
+        print('\033[38;5;011macc:', acc / cnt, 'highest:', highest_acc, '\033[0m')
 
 
 
@@ -72,7 +75,7 @@ def main():
     net = EEGNet('LeakyReLU').to(device)
 
     # hyper parameters
-    batch_size = 100
+    batch_size = 540
     learning_rate = 0.001
     epoches = 2000
     optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)

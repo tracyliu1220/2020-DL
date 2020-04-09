@@ -45,7 +45,7 @@ class EEGNet(nn.Module):
                 stride=(1, 4),
                 padding=0
             ),
-            nn.Dropout(p=0.25)
+            nn.Dropout(p=0.6)
         )
         self.separableConv = nn.Sequential(
             nn.Conv2d(
@@ -69,7 +69,7 @@ class EEGNet(nn.Module):
                 stride=(1, 8),
                 padding=0
             ),
-            nn.Dropout(p=0.25)
+            nn.Dropout(p=0.6)
         )
         self.classify = nn.Sequential(
             nn.Linear(

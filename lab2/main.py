@@ -5,50 +5,38 @@ import torch.utils.data as data
 from EEGNet import *
 from DeepConvNet import *
 import torch.multiprocessing as mp
+import json
 
 # mp.set_start_method('spawn')
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-# device = torch.device("cpu")
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+# device = torch.device('cpu')
 torch.set_default_dtype(torch.double)
 
-highest_acc = 0
+def Train(net, trainloader, loss_func, learning_rate):
+    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
+    net.train()
+    running_loss = 0
+    cnt = 0
+    acc = 0
+    for i, _data in enumerate(trainloader, 0):
+        cnt += 1
+        inputs, labels = _data
+        optimizer.zero_grad()
 
-def Train(net, epoches, train_data, test_data, optimizer, loss_func, batch_size=64, print_steps=5):
-    testloader = data.DataLoader(test_data, batch_size=120, shuffle=False, num_workers=0)
+        outputs = net(inputs)
+        loss = loss_func(outputs, labels)
+        loss.backward()
+        optimizer.step()
+        running_loss += loss.item()
+        acc += accuracy(outputs, labels)
+    acc = acc / cnt
+    running_loss = running_loss / cnt
+    return acc * 100
 
-    for epoch in range(epoches):
-        net.train()
-        trainloader = data.DataLoader(train_data, batch_size=batch_size, shuffle=True, num_workers=0)
-        print('\033[38;5;014mepoch', epoch, '\033[0m')
-        running_loss = 0
-        cnt = 0
-        acc = 0
-        for i, _data in enumerate(trainloader, 0):
-            cnt += 1
-            inputs, labels = _data
-            # inputs = inputs.to(device)
-            # labels = labels.to(device)
-            optimizer.zero_grad()
-            
-            outputs = net(inputs)
-            loss = loss_func(outputs, labels)
-            loss.backward()
-            optimizer.step()
-            # print('loss:', loss.item())
-            # print('acc :', accuracy(outputs, labels))
-            running_loss += loss.item()
-            acc += accuracy(outputs, labels)
 
-        print('loss:', running_loss / cnt)
-        print('acc :', acc / cnt)
-        # if (epoch + 1) % print_steps == 0:
-        #     Test(net, testloader, loss_func)
-        Test(net, testloader, loss_func)
-
-def Test(net, testloader, loss_func):
+def Test(net, net_name, testloader, loss_func, target_acc):
     net.eval()
     with torch.no_grad():
-        global highest_acc
         running_loss = 0
         cnt = 0
         acc = 0
@@ -61,35 +49,73 @@ def Test(net, testloader, loss_func):
             loss = loss_func(outputs, labels)
             running_loss += loss.item()
             acc += accuracy(outputs, labels)
-        # print('\033[38;5;011m---')
-        # print('test loss:', running_loss / cnt)
-        # print('test acc :', acc / cnt)
-        # print('---\033[0m')
-        highest_acc = max(highest_acc, acc / cnt)
-        print('\033[38;5;011macc:', acc / cnt, 'highest:', highest_acc, '\033[0m')
+        acc = acc / cnt
+    return acc * 100
+
+def ChangeState(net, net_name, train_acc, test_acc, target_acc, results):
+    # results
+    results[net_name]['train_acc'].append(train_acc)
+    results[net_name]['test_acc'].append(test_acc)
+
+    # target
+    if test_acc > target_acc[net_name]:
+        torch.save(net.state_dict(), 'results/weights/'+net_name+'-'+'{:.2f}'.format(test_acc)+'.pth')
+        target_acc[net_name] = test_acc
 
 
+def TrainIter(net_id, loader, hyper, target_acc, results):
+    print('\033[38;5;011m'+net_id['name']+'\033[0m')
+    for epoch in range(hyper['epoches']):
+        print('\033[38;5;014mepoch', epoch, '\033[0m')
+        train_acc = Train(net_id['net'], loader['train'], hyper['loss_func'], hyper['learning_rate'])
+        test_acc  = Test(net_id['net'], net_id['name'], loader['test'], hyper['loss_func'], target_acc)
+        ChangeState(net_id['net'], net_id['name'], train_acc, test_acc, target_acc, results)
+        print('train acc:', '{:.2f}'.format(train_acc), ' ', 'test acc:', '{:.2f}'.format(test_acc), ' ', '\033[38;5;010mhighest:', '{:.2f}'.format(target_acc[net_id['name']]), '\033[0m')
 
 def main():
     # net: DeepConvNet, EEGNet
-    net = EEGNet('LeakyReLU').to(device)
+    EEGNet_ReLU      = EEGNet('ReLU').to(device)
+    EEGNet_LeakyReLU = EEGNet('LeakyReLU').to(device)
+    EEGNet_ELU       = EEGNet('ELU').to(device)
+    DeepConvNet_ReLU      = DeepConvNet('ReLU').to(device)
+    DeepConvNet_LeakyReLU = DeepConvNet('LeakyReLU').to(device)
+    DeepConvNet_ELU       = DeepConvNet('ELU').to(device)
+    nets = [ {'net': EEGNet_ReLU,           'name': 'EEGNet_ReLU'},
+             {'net': EEGNet_LeakyReLU,      'name': 'EEGNet_LeakyReLU'},
+             {'net': EEGNet_ELU,            'name': 'EEGNet_ELU'},
+             {'net': DeepConvNet_ReLU,      'name': 'DeepConvNet_ReLU'},
+             {'net': DeepConvNet_LeakyReLU, 'name': 'DeepConvNet_LeakyReLU'},
+             {'net': DeepConvNet_ELU,       'name': 'DeepConvNet_ELU'} ]
 
     # hyper parameters
-    batch_size = 540
-    learning_rate = 0.001
-    epoches = 2000
-    optimizer = torch.optim.Adam(net.parameters(), lr=learning_rate)
-    # optimizer = torch.optim.SGD(net.parameters(), lr=learning_rate, momentum=0.5, nesterov=True)
-    loss_func = nn.CrossEntropyLoss()
+    hyper = {'batch_size'   : 1080,
+             'learning_rate': 0.001,
+             'epoches'      : 2000,
+             'loss_func'    : nn.CrossEntropyLoss()}
 
     # data
-    train_data = TrainSet()
-    test_data = TestSet()
-    
-    # train
-    Train(net, epoches, train_data, test_data, optimizer, loss_func, batch_size)
+    trainloader = data.DataLoader(TrainSet(), batch_size=hyper['batch_size'], num_workers=0)
+    testloader = data.DataLoader(TestSet(), batch_size=1080, num_workers=0)
+    loader = {'train': trainloader, 'test': testloader}
 
-    print('done')
+    # target acc
+    with open('results/target_acc.json', 'r') as f:
+        target_acc = json.load(f)
+    print(target_acc)
+    
+    # results
+    with open('results/results_initial.json', 'r') as f:
+        results = json.load(f)
+    print(results)
+
+    # train
+    for net_id in nets:
+        TrainIter(net_id, loader, hyper, target_acc, results)
+
+    with open('results/target_acc.json', 'w') as f:
+        f.write(json.dumps(target_acc))
+    with open('results/results.json', 'w') as f:
+        f.write(json.dumps(results))
 
 if __name__ == '__main__':
     main()

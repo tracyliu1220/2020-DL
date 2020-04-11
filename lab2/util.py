@@ -4,7 +4,7 @@ import torch.nn as nn
 import torch.utils.data as data
 import torch.multiprocessing as mp
 
-mp.set_start_method('spawn')
+# mp.set_start_method('spawn')
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
 torch.set_default_dtype(torch.double)
@@ -30,8 +30,8 @@ def accuracy(y, t):
 class TrainSet(data.Dataset):
     def __init__(self):
         self.train_data, self.train_label = read_bci_train_data()
-        self.train_data = self.train_data.to(device)
-        self.train_label = self.train_label.long().to(device)
+        self.train_data = self.train_data
+        self.train_label = self.train_label.long()
     def __getitem__(self, idx):
         return self.train_data[idx], self.train_label[idx]
     def __len__(self):

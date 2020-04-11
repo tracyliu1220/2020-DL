@@ -1,0 +1,6 @@
+EEGNet_ReLU
+EEGNet_LeakyReLU
+EEGNet_ELU
+DeepConvNet_ReLU
+DeepConvNet_LeakyReLU
+DeepConvNet_ELU

@@ -1,0 +1,1 @@
+{"EEGNet_ReLU": {"test_acc": [], "train_acc": []}, "EEGNet_LeakyReLU": {"test_acc": [], "train_acc": []}, "EEGNet_ELU": {"test_acc": [], "train_acc": []}, "DeepConvNet_ReLU": {"test_acc": [], "train_acc": []}, "DeepConvNet_LeakyReLU": {"test_acc": [], "train_acc": []}, "DeepConvNet_ELU": {"test_acc": [], "train_acc": []}}

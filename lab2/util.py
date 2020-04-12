@@ -18,6 +18,7 @@ def which_activate(choice):
     activate_func = activate_functions[choice]
     return activate_func
 
+'''
 def accuracy(y, t):
     cnt = 0
     for i in range(y.shape[0]):
@@ -26,6 +27,10 @@ def accuracy(y, t):
         if (y[i][0] < y[i][1]) and t[i] == 1:
             cnt = cnt + 1
     return cnt / y.shape[0]
+'''
+
+def accuracy(y, t):
+    return (torch.max(y, 1)[1] == t.long().view(-1)).sum().item() / len(y)
 
 class TrainSet(data.Dataset):
     def __init__(self):

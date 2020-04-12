@@ -34,7 +34,7 @@ def Train(net, trainloader, loss_func, learning_rate):
     return acc * 100
 
 
-def Test(net, net_name, testloader, loss_func, target_acc):
+def Test(net, net_name, testloader, loss_func):
     net.eval()
     with torch.no_grad():
         running_loss = 0
@@ -68,11 +68,27 @@ def TrainIter(net_id, loader, hyper, target_acc, results):
     for epoch in range(hyper['epoches']):
         print('\033[38;5;014mepoch', epoch, '\033[0m')
         train_acc = Train(net_id['net'], loader['train'], hyper['loss_func'], hyper['learning_rate'])
-        test_acc  = Test(net_id['net'], net_id['name'], loader['test'], hyper['loss_func'], target_acc)
+        test_acc  = Test(net_id['net'], net_id['name'], loader['test'], hyper['loss_func'])
         ChangeState(net_id['net'], net_id['name'], train_acc, test_acc, target_acc, results)
         print('train acc:', '{:.2f}'.format(train_acc), ' ', 'test acc:', '{:.2f}'.format(test_acc), ' ', '\033[38;5;010mhighest:', '{:.2f}'.format(target_acc[net_id['name']]), '\033[0m')
 
+def Demo(net_id, testloader, loss_func):
+    pth = {
+        'DeepConvNet_ELU': 'DeepConvNet_ELU-79.35.pth',
+        'DeepConvNet_LeakyReLU': 'DeepConvNet_LeakyReLU-80.46.pth',
+        'DeepConvNet_ReLU': 'DeepConvNet_ReLU-80.09.pth',
+        'EEGNet_ELU': 'EEGNet_ELU-84.63.pth',
+        'EEGNet_LeakyReLU': 'EEGNet_LeakyReLU-88.80.pth',
+        'EEGNet_ReLU': 'EEGNet_ReLU-88.43.pth'
+    }
+    net_id['net'].load_state_dict(torch.load('results/weights/'+pth[net_id['name']]))
+    test_acc = Test(net_id['net'], net_id['name'], testloader, loss_func)
+    print(('\033[38;5;011m'+net_id['name']).ljust(30, ' '), '\t', '\033[0mtest acc:', '{:.2f}'.format(test_acc), ' ', )
+
 def main():
+    # control: train, demo
+    action = 'train'
+
     # net: DeepConvNet, EEGNet
     EEGNet_ReLU      = EEGNet('ReLU').to(device)
     EEGNet_LeakyReLU = EEGNet('LeakyReLU').to(device)
@@ -101,17 +117,18 @@ def main():
     # target acc
     with open('results/target_acc.json', 'r') as f:
         target_acc = json.load(f)
-    print(target_acc)
     
     # results
     with open('results/results_initial.json', 'r') as f:
         results = json.load(f)
-    print(results)
 
-    # train
+    # action
     for net_id in nets:
-        TrainIter(net_id, loader, hyper, target_acc, results)
-
+        if action == 'train':
+            TrainIter(net_id, loader, hyper, target_acc, results)
+        if action == 'demo':
+            Demo(net_id, testloader, hyper['loss_func'])
+    
     with open('results/target_acc.json', 'w') as f:
         f.write(json.dumps(target_acc))
     with open('results/results.json', 'w') as f:

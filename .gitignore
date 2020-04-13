@@ -1,2 +1,3 @@
 *.npz
+*.csv
 *__pycache__*

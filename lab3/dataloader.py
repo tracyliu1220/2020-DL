@@ -1,16 +1,19 @@
 import pandas as pd
+import torch
 from torch.utils import data
+from torchvision import transforms
+from PIL import Image
 import numpy as np
-
+import sys
 
 def getData(mode):
     if mode == 'train':
-        img = pd.read_csv('train_img.csv')
-        label = pd.read_csv('train_label.csv')
+        img = pd.read_csv('data/train_img.csv')
+        label = pd.read_csv('data/train_label.csv')
         return np.squeeze(img.values), np.squeeze(label.values)
     else:
-        img = pd.read_csv('test_img.csv')
-        label = pd.read_csv('test_label.csv')
+        img = pd.read_csv('data/test_img.csv')
+        label = pd.read_csv('data/test_label.csv')
         return np.squeeze(img.values), np.squeeze(label.values)
 
 
@@ -25,7 +28,7 @@ class RetinopathyLoader(data.Dataset):
             self.label (int or float list): Numerical list that store all ground truth label values.
         """
         self.root = root
-        self.img_name, self.label = getData(mode)
+        self.img_name, self.labels = getData(mode)
         self.mode = mode
         print("> Found %d images..." % (len(self.img_name)))
 
@@ -53,5 +56,14 @@ class RetinopathyLoader(data.Dataset):
                          
             step4. Return processed image and label
         """
-
+        path = self.root + self.img_name[index] + '.jpeg'
+        img = transforms.ToTensor()(Image.open(path))
+        label = self.labels[index]
         return img, label
+
+if __name__ == '__main__':
+    np.set_printoptions(threshold=sys.maxsize)
+
+    dataset = RetinopathyLoader('data/imgs/', 'train')
+    inputs, labels = dataset[2]
+    print(dataset.labels)

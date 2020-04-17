@@ -29,6 +29,7 @@ class RetinopathyLoader(data.Dataset):
         """
         self.root = root
         self.img_name, self.labels = getData(mode)
+        self.labels = self.labels.reshape((self.labels.shape[0], 1))
         self.mode = mode
         print("> Found %d images..." % (len(self.img_name)))
 
@@ -63,7 +64,7 @@ class RetinopathyLoader(data.Dataset):
 
 if __name__ == '__main__':
     np.set_printoptions(threshold=sys.maxsize)
+    dataset = RetinopathyLoader('data/imgs/', 'test')
 
-    dataset = RetinopathyLoader('data/imgs/', 'train')
-    inputs, labels = dataset[2]
-    print(dataset.labels)
+    inputs, labels = dataset[3]
+    print(inputs[0][100])

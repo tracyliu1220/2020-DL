@@ -29,7 +29,7 @@ class RetinopathyLoader(data.Dataset):
         """
         self.root = root
         self.img_name, self.labels = getData(mode)
-        self.labels = self.labels.reshape((self.labels.shape[0], 1))
+        # self.labels = self.labels.reshape((self.labels.shape[0], 1))
         self.mode = mode
         print("> Found %d images..." % (len(self.img_name)))
 
@@ -58,7 +58,10 @@ class RetinopathyLoader(data.Dataset):
             step4. Return processed image and label
         """
         path = self.root + self.img_name[index] + '.jpeg'
-        img = transforms.ToTensor()(Image.open(path))
+        img = Image.open(path)
+        if self.mode == 'train':
+            img = transforms.RandomHorizontalFlip(p=0.5)(img)
+        img = transforms.ToTensor()(img)
         label = self.labels[index]
         return img, label
 

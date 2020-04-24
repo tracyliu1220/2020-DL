@@ -40,14 +40,7 @@ class ResNet(nn.Module):
         self.layer4 = pretrained_model._modules['layer4']
 
         self.avgpool = nn.AdaptiveAvgPool2d(1)
-        
-        self.dropout = nn.Dropout(p=0.5)
-        self.classify = nn.Linear(self.last_input_size, 1)
-        self.relu = nn.ReLU()
-
-        # self.dropout2 = nn.Dropout(p=0.3)
-        # self.classify2 = nn.Linear(10, 1)
-        # self.relu2 = nn.ReLU()
+        self.classify = nn.Linear(self.last_input_size, 5)
 
         del pretrained_model
 
@@ -63,20 +56,16 @@ class ResNet(nn.Module):
         x = self.layer4(x)
 
         x = self.avgpool(x)
-        # print(x.shape)
         x = x.view(x.size(0), -1)
-        x = self.dropout(x)
         x = self.classify(x)
-        x = self.relu(x)
-        # x = self.dropout2(x)
-        # x = self.classify2(x)
-        # x = self.relu2(x)
 
         return x
 
 if __name__ == '__main__':
-    resnet = ResNet('resnet18', model_size=18)
+    resnet18 = ResNet('resnet18', model_size=18)
+    resnet50 = ResNet('resnet50', model_size=50)
     # for param in resnet.parameters():
     #     print(param)
 
-    print(resnet)
+    print(resnet18)
+    print(resnet50)

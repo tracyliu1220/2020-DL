@@ -8,7 +8,7 @@ SOS_token = -1
 EOS_token = -2
 '''
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def charToIndex(c):
     if c == 'SOS':
@@ -28,7 +28,7 @@ def stringToTorch(str, is_tar=False):
         ret.append([charToIndex(c)])
     if is_tar:
         ret.append([charToIndex('EOS')])
-    return torch.from_numpy(np.array(ret)).to(device)
+    return torch.from_numpy(np.array(ret)) # .to(device)
 
 def torchToString(t):
     ret = ''
@@ -38,9 +38,14 @@ def torchToString(t):
         ret += indexToChar(num[0])
     return ret
 
-class TrainSet(data.Dataset):
-    def __init__(self):
-        f = open('train.json')
+class DataSet(data.Dataset):
+    def __init__(self, mode):
+        if mode == 'train':
+            path = 'data/train.json'
+        else:
+            path = 'data/test.json'
+
+        f = open(path)
         f_dict = json.loads(f.read())
         f.close()
 
@@ -59,8 +64,21 @@ class TrainSet(data.Dataset):
 
 
 if __name__ == '__main__':
-    train_set = TrainSet()
+    train_set = DataSet('train')
+    test_set = DataSet('test')
     test_in, test_tar = train_set[3]
     print(test_in)
+    print(test_tar)
     print(stringToTorch(test_in))
     print(torchToString(stringToTorch(test_in)))
+
+    max_len = 0
+    # for _in, _tar in train_set:
+    #     max_len = max(max_len, len(_in))
+    #     max_len = max(max_len, len(_tar))
+    
+    for _in, _tar in test_set:
+        max_len = max(max_len, len(_in))
+        max_len = max(max_len, len(_tar))
+
+    print(max_len)

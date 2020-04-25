@@ -16,6 +16,7 @@ import matplotlib.ticker as ticker
 import numpy as np
 from os import system
 from nltk.translate.bleu_score import SmoothingFunction, sentence_bleu
+from loader import *
 
 
 
@@ -38,14 +39,17 @@ implement by yourself.
 ========================================================================================"""
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SOS_token = -1
-EOS_token = -2
+device = torch.device("cpu")
+SOS_token = 0
+EOS_token = 1
 #----------Hyper Parameters----------#
 hidden_size = 256
 #The number of vocabulary
 vocab_size = 29
-teacher_forcing_ratio = 1.0
+teacher_forcing_ratio = 0.5
 LR = 0.05
+MAX_LENGTH = 20
+print_every = 200
 
 
 ################################
@@ -57,9 +61,17 @@ reference = 'variable'
 output = 'varable'
 
 #compute BLEU-4 score
+# def compute_bleu(output, reference):
+#    cc = SmoothingFunction()
+#     return sentence_bleu([reference], output,weights=(0.25, 0.25, 0.25, 0.25),smoothing_function=cc.method1)
+
 def compute_bleu(output, reference):
     cc = SmoothingFunction()
-    return sentence_bleu([reference], output,weights=(0.25, 0.25, 0.25, 0.25),smoothing_function=cc.method1)
+    if len(reference) == 3:
+        weights = (0.33,0.33,0.33)
+    else:
+        weights = (0.25,0.25,0.25,0.25)
+    return sentence_bleu([reference], output,weights=weights,smoothing_function=cc.method1)
 
 
 #Encoder
@@ -69,12 +81,15 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
 
         self.embedding = nn.Embedding(input_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
+        self.lstm = nn.LSTM(hidden_size, hidden_size)
 
     def forward(self, input, hidden):
+        # input = input.view(-1)
+        # print(input.shape)
+        # print(input)
         embedded = self.embedding(input).view(1, 1, -1)
         output = embedded
-        output, hidden = self.gru(output, hidden)
+        output, hidden = self.lstm(output, hidden)
         return output, hidden
 
     def initHidden(self):
@@ -87,14 +102,15 @@ class DecoderRNN(nn.Module):
         self.hidden_size = hidden_size
 
         self.embedding = nn.Embedding(output_size, hidden_size)
-        self.gru = nn.GRU(hidden_size, hidden_size)
+        self.lstm = nn.LSTM(hidden_size, hidden_size)
         self.out = nn.Linear(hidden_size, output_size)
         self.softmax = nn.LogSoftmax(dim=1)
 
     def forward(self, input, hidden):
         output = self.embedding(input).view(1, 1, -1)
         output = F.relu(output)
-        output, hidden = self.gru(output, hidden)
+        # print("\033[38;5;011mdecode forward\033[0m")
+        output, hidden = self.lstm(output, hidden)
         output = self.out(output[0])
         return output, hidden
 
@@ -102,8 +118,11 @@ class DecoderRNN(nn.Module):
         return torch.zeros(1, 1, self.hidden_size, device=device)
 
 
-def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH):
-    encoder_hidden = encoder.initHidden()
+def train(iter, input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH):
+    encoder.train()
+    decoder.train()
+
+    encoder_hidden = (encoder.initHidden(), encoder.initHidden())
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -116,7 +135,15 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     loss = 0
 
     #----------sequence to sequence part for encoder----------#
-    encoder_output, encoder_hidden = encoder(input_tensor, encoder_hidden)
+    # encoder_output, encoder_hidden = encoder(input_tensor, encoder_hidden)
+    # print(input_tensor[0])
+    # print(input_tensor[0].size())
+    for ei in range(input_length):
+        encoder_output, encoder_hidden = encoder(input_tensor[ei], encoder_hidden)
+        encoder_outputs[ei] = encoder_output[0, 0]
+
+    # print("----encode finished----")
+    # print(encoder_output)
 
 
     decoder_input = torch.tensor([[SOS_token]], device=device)
@@ -125,21 +152,23 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
     use_teacher_forcing = True if random.random() < teacher_forcing_ratio else False
 
+    decoder_outputs = []
+
 
     #----------sequence to sequence part for decoder----------#
     if use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
         for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+            decoder_output, decoder_hidden = decoder(decoder_input, decoder_hidden)
+            decoder_outputs.append(decoder_output)
             loss += criterion(decoder_output, target_tensor[di])
             decoder_input = target_tensor[di]  # Teacher forcing
 
     else:
         # Without teacher forcing: use its own predictions as the next input
         for di in range(target_length):
-            decoder_output, decoder_hidden, decoder_attention = decoder(
-                decoder_input, decoder_hidden, encoder_outputs)
+            decoder_output, decoder_hidden, = decoder(decoder_input, decoder_hidden)
+            decoder_outputs.append(decoder_output)
             topv, topi = decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
@@ -147,12 +176,19 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
             if decoder_input.item() == EOS_token:
                 break
 
+    if iter % print_every == 0:
+        print('>', torchToString(decoder_outputs))
+    
+    # print("----decode finished----")
+
     loss.backward()
 
     encoder_optimizer.step()
     decoder_optimizer.step()
 
     return loss.item() / target_length
+
+# def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length=MAX_LENGTH):
 
 
 def asMinutes(s):
@@ -179,16 +215,29 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
     encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
     # your own dataloader
-    training_pairs = ...
+    # training_pairs = ...
+    trainloader = DataSet('train')
 
     criterion = nn.CrossEntropyLoss()
 
-    for iter in range(1, n_iters + 1):
-        training_pair = training_pairs[iter - 1]
-        input_tensor = training_pair[0]
-        target_tensor = training_pair[1]
+    # for iter in range(1, n_iters + 1):
+    #     training_pair = training_pairs[iter - 1]
+    #     input_tensor = training_pair[0]
+    #     target_tensor = training_pair[1]
 
-        loss = train(input_tensor, target_tensor, encoder,
+    for iter in range(1, n_iters + 1):
+        idx = iter - 1
+        input_vocab, target_vocab = trainloader[idx]
+        input_tensor = stringToTorch(input_vocab).to(device)
+        target_tensor = stringToTorch(target_vocab).to(device)
+
+        # print(input_tensor.size(), target_tensor.size())
+        
+        if iter % print_every == 0:
+            print('<', input_vocab)
+            print('=', target_vocab)
+
+        loss = train(iter, input_tensor, target_tensor, encoder,
                      decoder, encoder_optimizer, decoder_optimizer, criterion)
         print_loss_total += loss
         plot_loss_total += loss
@@ -202,4 +251,4 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
 
 encoder1 = EncoderRNN(vocab_size, hidden_size).to(device)
 decoder1 = DecoderRNN(hidden_size, vocab_size).to(device)
-trainIters(encoder1, decoder1, 75000, print_every=5000)
+trainIters(encoder1, decoder1, 100000, print_every=print_every) #5000)

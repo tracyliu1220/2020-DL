@@ -4,22 +4,21 @@ import json
 import numpy as np
 import random
 
-'''
 SOS_token = 0
 EOS_token = 1
-'''
+UNK_token = 29
 
 # device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def charToIndex(c):
     if c == 'SOS':
-        return 0
+        return SOS_token
     elif c == 'EOS':
-        return 1
+        return EOS_token
     return int(ord(c) - ord('a')) + 2
 
 def indexToChar(idx):
-    if idx == 0 or idx == 1:
+    if idx == SOS_token or idx == EOS_token or idx == UNK_token:
         return ''
     return chr(ord('a') + idx - 2)
 
@@ -27,34 +26,26 @@ def stringToTorch(str, is_tar=False):
     ret = []
     for c in str:
         idx = charToIndex(c)
-        # one_hot = [ 0 for i in range(29) ]
-        # one_hot[idx] = 1
-        # ret.append([one_hot])
         ret.append([idx])
     if is_tar:
-        # tar = [ 0 for i in range(29) ]
-        # tar[charToIndex('EOS') + 2] = 1;
-        # ret.append([tar])
         ret.append([charToIndex('EOS')])
+
     return torch.from_numpy(np.array(ret)) # .to(device)
 
 def torchToString(t):
     ret = ''
     for num in t:
-        # num = num[0]
-        num = torch.max(num[0], 0)[1]
+        num = num[0]
+        # num = torch.max(num[0], 0)[1]
         # print(num)
-        if num == 0 or num == 1:
+        if num == SOS_token or num == EOS_token:
             continue
         ret += indexToChar(num)
     return ret
 
 class DataSet(data.Dataset):
     def __init__(self, mode):
-        if mode == 'train':
-            path = 'data/train.json'
-        else:
-            path = 'data/test.json'
+        path = 'data/'+mode+'.json'
 
         f = open(path)
         f_dict = json.loads(f.read())
@@ -80,8 +71,11 @@ class DataSet(data.Dataset):
 
 if __name__ == '__main__':
     train_set = DataSet('train')
+    test_set = DataSet('test')
+    print(len(train_set))
+    print(len(test_set))
     test_in, test_tar = train_set[3]
     print(test_in)
     print(test_tar)
-    print(stringToTorch(test_in))
+    print(stringToTorch(test_in, is_tar=True))
     print(torchToString(stringToTorch(test_in)))

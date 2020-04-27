@@ -305,7 +305,7 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
                     print('---')
                     print('<', input_vocab)
                     print('=', target_vocab)
-                    print('>', decoder_outputs)
+                    print('>', output_vocab)
 
             bleu_score /= len(testloader)
             results.append(bleu_score * 100)
@@ -321,7 +321,7 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
 def demo():
     encoder = torch.load('results/weights/96.10-encoder.pth')
     decoder = torch.load('results/weights/96.10-decoder.pth')
-    testloader = DataSet('test2')
+    testloader = DataSet('test')
     bleu_score = 0
     for i in range(len(testloader)):
         input_vocab, target_vocab = testloader[i]
@@ -329,6 +329,14 @@ def demo():
         bleu_score += compute_bleu(output_vocab, target_vocab)
     bleu_score /= len(testloader)
     print('\033[38;5;011mbleu_score: ', bleu_score, '\033[0m')
+    for i in range(4):
+        input_vocab, target_vocab = testloader[i]
+        output_vocab = test(input_vocab, encoder, decoder)
+        print('---')
+        print('<', input_vocab)
+        print('=', target_vocab)
+        print('>', output_vocab)
+
     while True:
         print('---')
         input_vocab = input('< ')

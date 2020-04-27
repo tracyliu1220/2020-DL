@@ -53,7 +53,7 @@ teacher_forcing_ratio = 0.5
 LR = 0.01
 MAX_LENGTH = 30
 print_every = 5000
-target_bleu = 0.00
+target_bleu = 1.2
 
 
 ################################
@@ -193,27 +193,22 @@ def train(iter, input_tensor, target_tensor, encoder, decoder, encoder_optimizer
 
     return loss.item() / target_length
 
-def test(input_vocab, target_vocab, encoder, decoder, prnt=False):
+def test(input_vocab, encoder, decoder):
     encoder.eval()
     decoder.eval()
     global print_output
     
     with torch.no_grad():
         input_tensor = stringToTorch(input_vocab, is_tar=True).to(device)
-        target_tensor = stringToTorch(target_vocab, is_tar=True).to(device)
 
         encoder_hidden = (encoder.initHidden(), encoder.initHidden())
-
         input_length = input_tensor.size(0)
-        target_length = target_tensor.size(0)
 
         for ei in range(input_length):
             encoder_output, encoder_hidden = encoder(input_tensor[ei], encoder_hidden)
 
         decoder_input = torch.tensor([[SOS_token]], device=device)
-
         decoder_hidden = encoder_hidden
-
         decoder_outputs = ''
 
         for di in range(25):
@@ -225,13 +220,7 @@ def test(input_vocab, target_vocab, encoder, decoder, prnt=False):
             if decoder_input.item() == EOS_token:
                 break
 
-        if prnt:
-            print('---')
-            print('<', input_vocab)
-            print('=', target_vocab)
-            print('>', decoder_outputs)
-
-    return compute_bleu(decoder_outputs, target_vocab)
+    return decoder_outputs
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -310,35 +299,45 @@ def trainIters(encoder, decoder, n_iters, print_every=1000, plot_every=100, lear
             for i in range(len(testloader)):
                 prnt = True if i == print_idx else False
                 input_vocab, target_vocab = testloader[i]
-                bleu_score += test(input_vocab, target_vocab, encoder, decoder, prnt=prnt)
+                output_vocab = test(input_vocab, encoder, decoder)
+                bleu_score += compute_bleu(output_vocab, target_vocab)
+                if prnt:
+                    print('---')
+                    print('<', input_vocab)
+                    print('=', target_vocab)
+                    print('>', decoder_outputs)
 
             bleu_score /= len(testloader)
             results.append(bleu_score * 100)
             print('\033[38;5;011mbleu_score: ', bleu_score, '\033[0m')
             if bleu_score >= target_bleu:
                 target_bleu = bleu_score
-                torch.save(encoder, 'results/weights/v3/{:.2f}-encoder.pth'.format(bleu_score * 100))
-                torch.save(decoder, 'results/weights/v3/{:.2f}-decoder.pth'.format(bleu_score * 100))
-            with open('results/results.json', 'w') as f:
-                f.write(json.dumps(results))
+                torch.save(encoder, 'results/weights/v1024/{:.2f}-encoder.pth'.format(bleu_score * 100))
+                torch.save(decoder, 'results/weights/v1024/{:.2f}-decoder.pth'.format(bleu_score * 100))
+            # with open('results/results.json', 'w') as f:
+            #     f.write(json.dumps(results))
     return results
 
 def demo():
-    encoder = torch.load('results/weights/76.14-encoder.pth')
-    decoder = torch.load('results/weights/76.14-decoder.pth')
+    encoder = torch.load('results/weights/96.10-encoder.pth')
+    decoder = torch.load('results/weights/96.10-decoder.pth')
     testloader = DataSet('test2')
     bleu_score = 0
     for i in range(len(testloader)):
         input_vocab, target_vocab = testloader[i]
-        bleu_score += test(input_vocab, target_vocab, encoder, decoder, prnt=True)
+        output_vocab = test(input_vocab, encoder, decoder)
+        bleu_score += compute_bleu(output_vocab, target_vocab)
     bleu_score /= len(testloader)
     print('\033[38;5;011mbleu_score: ', bleu_score, '\033[0m')
+    while True:
+        print('---')
+        input_vocab = input('< ')
+        if input_vocab == '<END>':
+            break
+        print('>', test(input_vocab, encoder, decoder))
 
 
-encoder1 = EncoderRNN(vocab_size, hidden_size).to(device)
-decoder1 = DecoderRNN(hidden_size, vocab_size).to(device)
-# encoder1 = torch.load('results/weights/76.14-encoder.pth').to(device)
-# decoder1 = torch.load('results/weights/76.14-decoder.pth').to(device)
-results = trainIters(encoder1, decoder1, 1000000, print_every=print_every) #5000)
-# print(results)
-# demo()
+# encoder1 = EncoderRNN(vocab_size, hidden_size).to(device)
+# decoder1 = DecoderRNN(hidden_size, vocab_size).to(device)
+# trainIters(encoder1, decoder1, 1000000, print_every=print_every) #5000)
+demo()

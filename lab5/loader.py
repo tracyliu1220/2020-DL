@@ -45,30 +45,37 @@ def torchToString(t):
 
 class DataSet(data.Dataset):
     def __init__(self, mode):
-        path = 'data/'+mode+'.txt'
+        if mode == 'train':
+            path = 'data/train.txt'
 
-        f = open(path)
-        lines = f.readlines()
+            f = open(path)
+            lines = f.readlines()
 
-        self.input = []
-        self.target = []
-        self.condition = []
-        for line in lines:
-            line = line.strip().split(' ')
-            for i in range(4):
-                for j in range(4):
+            self.input = []
+            self.target = []
+            self.condition = []
+            for line in lines:
+                line = line.strip().split(' ')
+                for i in range(4):
                     self.input.append(line[i])
-                    self.target.append(line[j])
-                    # condition
-                    condition = [ 0 for k in range(8) ]
-                    condition[i] = 1
-                    condition[4 + j] = 1
-                    self.condition.append(condition)
-
+                    self.target.append(line[i])
+                    self.condition.append([i])
+            f.close()
+        elif mode == 'test':
+            path = 'data/test.txt'
+            f = open(path)
+            lines = f.readlines()
+            self.input = []
+            self.target = []
+            self.condition = [[3], [2], [1], [1], [1], [2], [0], [0], [3], [1]]
+            for line in lines:
+                line = line.strip().split(' ')
+                self.input.append(line[0])
+                self.target.append(line[1])
+            f.close()
+        
         self.rand = [ i for i in range(len(self.input)) ]
         random.shuffle(self.rand)
-        
-        f.close()
 
     def __getitem__(self, idx):
         idx = idx % len(self)

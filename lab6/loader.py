@@ -9,6 +9,11 @@ import sys
 trans1 = transforms.Compose([transforms.Resize((64, 64)),
                              transforms.ToTensor()])
 trans2 = transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+trans_save = transforms.Compose([
+        transforms.Normalize((-1.0, -1.0, -1.0), (2.0, 2.0, 2.0)),
+        transforms.ToPILImage()
+        ])
+
 
 def getImageTensor(path):
     img = Image.open(path)
@@ -46,9 +51,15 @@ if __name__ == '__main__':
     print(torch.zeros(3))
     traindata = TrainData()
     img, label = traindata[3]
-    print(img.shape)
-    print(img)
-    print(label.shape)
-    print(label)
-    print(len(traindata))
+    img = trans_save(img)
+    img.save('sample_real.png')
+    # print(img.shape)
+    # print(img)
+    # print(label.shape)
+    # print(label)
+    # print(len(traindata))
+    trainloader = data.DataLoader(traindata, batch_size=1, num_workers=8, pin_memory=True, shuffle=True)
+    img = getImageTensor('sample.png')
+    img = trans_save(img)
+    img.save('gen.png')
     

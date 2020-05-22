@@ -13,6 +13,9 @@ trans_save = transforms.Compose([
         transforms.Normalize((-1.0, -1.0, -1.0), (2.0, 2.0, 2.0)),
         transforms.ToPILImage()
         ])
+        
+with open('data/objects.json') as f:
+    objects = json.load(f)
 
 
 def getImageTensor(path):
@@ -22,13 +25,21 @@ def getImageTensor(path):
     img = trans2(img)
     return img
 
+def tensorToCondition(tensor):
+    condition = []
+    for i in range(24):
+        if tensor[0][i] == 1:
+            condition.append(objects['inverse'][str(i)])
+    return condition
+
+
 class TrainData(data.Dataset):
     def __init__(self):
         with open('data/train.json', 'r') as f:
             _dict = json.load(f)
         with open('data/objects.json') as f:
             _ob = json.load(f)
-
+            
         self.root = 'data/imgs/'
         self.file = []
         self.label = []
@@ -50,7 +61,7 @@ class TrainData(data.Dataset):
 if __name__ == '__main__':
     print(torch.zeros(3))
     traindata = TrainData()
-    img, label = traindata[3]
+    img, label = traindata[0]
     img = trans_save(img)
     img.save('sample_real.png')
     # print(img.shape)
@@ -62,4 +73,5 @@ if __name__ == '__main__':
     img = getImageTensor('sample.png')
     img = trans_save(img)
     img.save('gen.png')
+    print(tensorToCondition(label))
     

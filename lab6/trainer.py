@@ -31,25 +31,21 @@ def Train(netG, netD, optimG, optimD, trainloader):
     
     # netD
     # print('netD')
-    length = 5 # len(trainloader)
+    d_iter = 5 # len(trainloader)
 
     bar = pyprind.ProgPercent(len(trainloader))
     for _iter, _data in enumerate(trainloader, 0):
 
-        if _iter % length != 0: # netD
+        for _d_iter in range(d_iter):
             img, condition = _data 
             batch = len(condition)
             img = img.to(device)
             condition = condition.to(device)
     
-            # fake_tensor = torch.from_numpy(np.array([0] * batch)).to(device)
-            # real_tensor = torch.from_numpy(np.array([1] * batch)).to(device)
-
             loss = 0
             optimD.zero_grad()
             
             d_real, d_real_cond = netD(img)
-            # real_loss = d_real
             real_label_loss = label_w * label_criterion(d_real_cond, condition)
 
             z = torch.randn(batch, nz, device=device)
@@ -57,7 +53,6 @@ def Train(netG, netD, optimG, optimD, trainloader):
             ep = torch.rand(batch, 1, 1, 1, device=device)
 
             d_fake, d_fake_cond = netD(x)
-            # fake_loss = d_fake
             fake_label_loss = label_w * label_criterion(d_fake_cond, condition)
 
             # compute gradient
@@ -74,35 +69,36 @@ def Train(netG, netD, optimG, optimD, trainloader):
             loss = -d_real + d_fake + gradient_loss
             loss += real_label_loss + fake_label_loss
 
+            loss = loss.mean(dim=0)
+
             loss.backward()
             optimD.step()
-            bar.update(1)
 
-        else:
-            img, condition = _data # netG
-            batch = len(condition)
-            img = img.to(device)
-            condition = condition.to(device)
-                
-            real_tensor = torch.from_numpy(np.array([1] * batch)).to(device)
+        img, condition = _data # netG
+        batch = len(condition)
+        img = img.to(device)
+        condition = condition.to(device)
             
-            optimG.zero_grad()
-            loss = 0
+        real_tensor = torch.from_numpy(np.array([1] * batch)).to(device)
+        
+        optimG.zero_grad()
+        loss = 0
 
-            z = torch.randn(batch, nz, device=device)
-            x = netG(z, condition)
-            d_fake, d_fake_cond = netD(x)
-            fake_label_loss = label_w * label_criterion(d_fake_cond, condition)
-            loss = -d_fake + fake_label_loss
+        z = torch.randn(batch, nz, device=device)
+        x = netG(z, condition)
+        d_fake, d_fake_cond = netD(x)
+        fake_label_loss = label_w * label_criterion(d_fake_cond, condition)
+        loss = -d_fake + fake_label_loss
+        loss = loss.mean(dim=0)
 
-            loss.backward()
-            optimG.step()
-            bar.update(1)
+        loss.backward()
+        optimG.step()
+        bar.update(1)
 
 def Test(netG, netE):
     acc = 0
     cnt = 0
-    length = 200 # len(trainloader)
+    length = len(trainloader)
     bar = pyprind.ProgPercent(length, title='Test')
     for i, _data in enumerate(trainloader, 0):
         img, condition = _data
@@ -119,6 +115,7 @@ def Test(netG, netE):
     img = trans_save(x[0].cpu()) # .convert('RGB')
     img.save('sample.png')
     print('acc: ', acc / cnt)
+    print(tensorToCondition(condition))
 
 def TrainIter(netG, netD, netE, trainloader):
     optimD = torch.optim.Adam(netD.parameters(), lr=lr)
